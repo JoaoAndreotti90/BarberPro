@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Professional {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services     Service[]
+  appointments Appointment[]
+
+  @@map("professionals")
+}
+
+model Service {
+  id             String   @id @default(uuid())
+  name           String
+  description    String?
+  price          Decimal  @db.Decimal(10, 2)
+  durationMinutes Int
+  professionalId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appointments    Appointment[]
+  messageHistory  MessageHistory[]
+
+  @@map("customers")
+}
+
+model Appointment {
+  id             String   @id @default(uuid())
+  dateTime       DateTime
+  status         AppointmentStatus @default(SCHEDULED)
+  customerId     String
+  serviceId      String
+  professionalId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  service      Service      @relation(fields: [serviceId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@map("appointments")
+}
+
+model MessageHistory {
+  id         String   @id @default(uuid())
+  content    String
+  role       MessageRole
+  customerId String
+  createdAt  DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@map("message_history")
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
