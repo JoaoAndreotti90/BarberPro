@@ -16,6 +16,7 @@ export class ScheduleService implements OnModuleInit {
         professional = await this.prisma.professional.create({
           data: { 
             name: 'Barbeiro Principal',
+            email: 'admin@barberpro.com',
             phone: '11999999999' 
           }
         });
