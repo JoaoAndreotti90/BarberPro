@@ -10,12 +10,23 @@ export class ScheduleService implements OnModuleInit {
     const count = await this.prisma.service.count();
 
     if (count === 0) {
+      let professional = await this.prisma.professional.findFirst();
+
+      if (!professional) {
+        professional = await this.prisma.professional.create({
+          data: { 
+            name: 'Barbeiro Principal',
+            phone: '11999999999' 
+          }
+        });
+      }
+
       await this.prisma.service.createMany({
         data: [
-          { name: 'Corte Tradicional', price: 45 },
-          { name: 'Barba', price: 35 },
-          { name: 'Corte + Barba', price: 70 },
-          { name: 'Pezinho', price: 15 },
+          { name: 'Corte Tradicional', price: 45, durationMinutes: 45, professionalId: professional.id },
+          { name: 'Barba', price: 35, durationMinutes: 30, professionalId: professional.id },
+          { name: 'Corte + Barba', price: 70, durationMinutes: 60, professionalId: professional.id },
+          { name: 'Pezinho', price: 15, durationMinutes: 15, professionalId: professional.id },
         ],
       });
     }
