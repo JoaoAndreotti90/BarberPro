@@ -16,24 +16,24 @@ export class ChatService {
     const genAI = new GoogleGenerativeAI(apiKey);
     
     this.model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash', 
+      model: 'gemini-flash-latest', 
       tools: [
         {
           functionDeclarations: [
             {
               name: 'buscar_servicos',
-              description: 'Retorna a lista de serviços e preços.',
+              description: 'Retorna a lista de serviços disponíveis e seus preços.',
             },
             {
               name: 'agendar_horario',
-              description: 'Agenda o serviço. Exige Nome, Telefone, NomeExatoDoServiço e Data.',
+              description: 'Agenda um serviço. Requer nome do cliente, telefone, nome exato do serviço e data/hora.',
               parameters: {
                 type: SchemaType.OBJECT,
                 properties: {
                   nomeCliente: { type: SchemaType.STRING },
                   telefoneCliente: { type: SchemaType.STRING },
                   nomeServico: { type: SchemaType.STRING },
-                  dataHora: { type: SchemaType.STRING, description: 'ISO 8601' },
+                  dataHora: { type: SchemaType.STRING, description: 'Data e hora no formato ISO 8601' },
                 },
                 required: ['nomeCliente', 'telefoneCliente', 'nomeServico', 'dataHora'],
               },
@@ -50,15 +50,17 @@ export class ChatService {
     });
 
     const promptInicial = `
-      Você é o recepcionista da BarberPro. Hoje é: ${new Date().toLocaleString('pt-BR')}.
+      Você é o recepcionista virtual da barbearia BarberPro.
+      Data de hoje: ${new Date().toLocaleString('pt-BR')}.
       
-      Diretrizes:
-      1. Se o cliente iniciar a conversa, chame buscar_servicos.
-      2. Se o cliente escolher o serviço, pergunte Dia, Horário, Nome e Telefone.
-      3. Se tiver todos os dados, chame agendar_horario.
-      4. Seja formal e direto. Não use emojis.
+      Regras de Atendimento:
+      1. Se o cliente disser "Oi", "Olá" ou iniciar a conversa, execute IMEDIATAMENTE a função "buscar_servicos". Não pergunte nada antes de mostrar os serviços.
+      2. Após mostrar os serviços, espere o cliente escolher um.
+      3. Quando o cliente escolher o serviço, pergunte: Dia, Horário, Nome e Telefone.
+      4. Somente quando tiver TODAS as 4 informações (Serviço, Dia, Horário, Nome, Telefone), execute a função "agendar_horario".
+      5. Seja formal e direto.
       
-      Cliente: ${message}
+      Mensagem do Cliente: ${message}
     `;
 
     try {
@@ -73,14 +75,14 @@ export class ChatService {
         
         if (call.name === 'buscar_servicos') {
           const services = await this.scheduleService.findAllServices(); 
-          respostaTexto = `Olá. Segue a lista de serviços:\n\n${services.map(s => `- ${s.name}: R$${s.price}`).join('\n')}\n\nQual serviço deseja agendar?`;
+          respostaTexto = `Olá! Aqui estão nossos serviços:\n\n${services.map(s => `✂️ ${s.name} - R$${s.price}`).join('\n')}\n\nQual serviço você gostaria de agendar?`;
         }
 
         else if (call.name === 'agendar_horario') {
           const args = call.args as any;
           
           if (!args.nomeCliente || !args.telefoneCliente || !args.dataHora || !args.nomeServico) {
-            respostaTexto = "Para confirmar, informe o Nome do Serviço, Dia, Horário, seu Nome e Telefone.";
+            respostaTexto = "Preciso de todos os dados para agendar: Nome do Serviço, Dia, Horário, seu Nome e Telefone.";
           } else {
             const allServices = await this.scheduleService.findAllServices();
             const service = allServices.find(s => 
@@ -88,22 +90,23 @@ export class ChatService {
             );
 
             if (!service) {
-              respostaTexto = `Serviço ${args.nomeServico} não encontrado. Por favor, verifique o nome.`;
+              respostaTexto = `Não encontrei o serviço "${args.nomeServico}". Por favor, escolha um serviço da lista.`;
             } else {
               const dataFormatada = new Date(args.dataHora);
 
               if (isNaN(dataFormatada.getTime())) {
-                respostaTexto = "Data inválida. Por favor, repita o dia e horário.";
+                respostaTexto = "Data inválida. Por favor, informe o dia e horário novamente (ex: Amanhã às 14h).";
               } else {
-                
                 const existingAppointments = await this.scheduleService.findAll();
+                
                 const isBusy = existingAppointments.some(appointment => {
                     const appointmentDate = new Date(appointment.dateTime);
-                    return Math.abs(appointmentDate.getTime() - dataFormatada.getTime()) < 60000;
+                    const timeDiff = Math.abs(appointmentDate.getTime() - dataFormatada.getTime());
+                    return timeDiff < 60 * 60 * 1000; 
                 });
 
                 if (isBusy) {
-                    respostaTexto = "Este horário já está reservado. Por favor, escolha outro horário.";
+                    respostaTexto = "❌ Esse horário já está ocupado. Por favor, escolha outro horário.";
                 } else {
                     await this.scheduleService.create({
                         customerName: args.nomeCliente,
@@ -112,7 +115,7 @@ export class ChatService {
                         dateTime: dataFormatada.toISOString(), 
                       });
                       
-                    respostaTexto = `Agendamento confirmado. Serviço: ${service.name}. Cliente: ${args.nomeCliente}. Data: ${dataFormatada.toLocaleString('pt-BR')}.`;
+                    respostaTexto = `✅ Agendamento Confirmado!\n\nServiço: ${service.name}\nCliente: ${args.nomeCliente}\nData: ${dataFormatada.toLocaleString('pt-BR')}\n\nTe esperamos lá!`;
                     this.conversationHistory = []; 
                 }
               }
@@ -133,11 +136,11 @@ export class ChatService {
       return respostaTexto;
 
     } catch (error: any) {
-      console.error("ERRO DETALHADO:", error);
+      console.error(error);
       if (error.message && error.message.includes('429')) {
-         return "O sistema está ocupado. Tente novamente em breve.";
+         return "Muitos pedidos no momento. Tente novamente em alguns segundos.";
       }
-      return "Ocorreu um erro técnico. Tente novamente.";
+      return "Ocorreu um erro técnico no agendamento. Tente novamente.";
     }
   }
 }
