@@ -45,8 +45,6 @@ export class ChatService {
   }
 
   async generateResponse(message: string) {
-    console.log(`\n💬 Recebi: "${message}"`); // LOG NOVO
-
     const chat = this.model.startChat({
       history: this.conversationHistory
     });
@@ -74,10 +72,8 @@ export class ChatService {
 
       if (functionCalls && functionCalls.length > 0) {
         const call = functionCalls[0];
-        console.log(`🤖 IA chamou a função: ${call.name}`); // LOG NOVO
         
         if (call.name === 'buscar_servicos') {
-          console.log("📂 Buscando serviços no banco..."); // LOG NOVO
           const services = await this.scheduleService.findAllServices(); 
           
           if (services.length === 0) {
@@ -88,7 +84,6 @@ export class ChatService {
         }
 
         else if (call.name === 'agendar_horario') {
-          console.log("📅 Tentando agendar..."); // LOG NOVO
           const args = call.args as any;
           
           if (!args.nomeCliente || !args.telefoneCliente || !args.dataHora || !args.nomeServico) {
@@ -132,20 +127,16 @@ export class ChatService {
             }
           }
         } else {
-            console.log("⚠️ IA chamou função desconhecida:", call.name);
             respostaTexto = "Desculpe, tive um erro interno ao processar sua solicitação.";
         }
       } else {
         respostaTexto = response.text();
       }
 
-      // CORREÇÃO FINAL: Se a resposta continuar vazia, colocamos um padrão
       if (!respostaTexto) {
-          console.log("⚠️ Resposta veio vazia da IA!");
           respostaTexto = "Olá! Como posso ajudar você hoje?";
       }
 
-      // Salva no histórico
       this.conversationHistory.push(
         { role: 'user', parts: [{ text: message }] },
         { role: 'model', parts: [{ text: respostaTexto }] }
@@ -154,7 +145,6 @@ export class ChatService {
       return respostaTexto;
 
     } catch (error: any) {
-      console.error("❌ ERRO NO CHAT:", error);
       if (error.message && error.message.includes('429')) {
          return "Muitos pedidos no momento. Tente novamente em alguns segundos.";
       }
