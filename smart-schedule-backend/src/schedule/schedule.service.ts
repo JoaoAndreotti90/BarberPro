@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
-export class ScheduleService {
+export class ScheduleService implements OnModuleInit {
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    const count = await this.prisma.service.count();
+
+    if (count === 0) {
+      await this.prisma.service.createMany({
+        data: [
+          { name: 'Corte Tradicional', price: 45 },
+          { name: 'Barba', price: 35 },
+          { name: 'Corte + Barba', price: 70 },
+          { name: 'Pezinho', price: 15 },
+        ],
+      });
+    }
+  }
 
   async create(dto: CreateScheduleDto) {
     const service = await this.prisma.service.findUnique({
