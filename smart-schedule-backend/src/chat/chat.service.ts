@@ -75,7 +75,7 @@ export class ChatService {
         
         if (call.name === 'buscar_servicos') {
           const services = await this.scheduleService.findAllServices(); 
-          respostaTexto = `Olá! Aqui estão nossos serviços:\n\n${services.map(s => `✂️ ${s.name} - R$${s.price}`).join('\n')}\n\nQual serviço você gostaria de agendar?`;
+          respostaTexto = `Olá! Aqui estão nossos serviços:\n\n${services.map(s => `- ${s.name}: R$${s.price}`).join('\n')}\n\nQual serviço você gostaria de agendar?`;
         }
 
         else if (call.name === 'agendar_horario') {
@@ -106,7 +106,7 @@ export class ChatService {
                 });
 
                 if (isBusy) {
-                    respostaTexto = "❌ Esse horário já está ocupado. Por favor, escolha outro horário.";
+                    respostaTexto = "Esse horário já está ocupado. Por favor, escolha outro horário.";
                 } else {
                     await this.scheduleService.create({
                         customerName: args.nomeCliente,
@@ -115,7 +115,7 @@ export class ChatService {
                         dateTime: dataFormatada.toISOString(), 
                       });
                       
-                    respostaTexto = `✅ Agendamento Confirmado!\n\nServiço: ${service.name}\nCliente: ${args.nomeCliente}\nData: ${dataFormatada.toLocaleString('pt-BR')}\n\nTe esperamos lá!`;
+                    respostaTexto = `Agendamento Confirmado!\n\nServiço: ${service.name}\nCliente: ${args.nomeCliente}\nData: ${dataFormatada.toLocaleString('pt-BR')}\n\nTe esperamos lá!`;
                     this.conversationHistory = []; 
                 }
               }
