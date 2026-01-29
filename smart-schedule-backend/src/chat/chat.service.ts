@@ -45,6 +45,8 @@ export class ChatService {
   }
 
   async generateResponse(message: string) {
+    console.log(`\n💬 Recebi: "${message}"`); // LOG NOVO
+
     const chat = this.model.startChat({
       history: this.conversationHistory
     });
@@ -72,20 +74,28 @@ export class ChatService {
 
       if (functionCalls && functionCalls.length > 0) {
         const call = functionCalls[0];
+        console.log(`🤖 IA chamou a função: ${call.name}`); // LOG NOVO
         
         if (call.name === 'buscar_servicos') {
+          console.log("📂 Buscando serviços no banco..."); // LOG NOVO
           const services = await this.scheduleService.findAllServices(); 
-          respostaTexto = `Olá! Aqui estão nossos serviços:\n\n${services.map(s => `- ${s.name}: R$${s.price}`).join('\n')}\n\nQual serviço você gostaria de agendar?`;
+          
+          if (services.length === 0) {
+             respostaTexto = "Olá! No momento não encontrei serviços cadastrados. Pode tentar novamente?";
+          } else {
+             respostaTexto = `Olá! Aqui estão nossos serviços:\n\n${services.map((s: any) => `- ${s.name}: R$${s.price}`).join('\n')}\n\nQual serviço você gostaria de agendar?`;
+          }
         }
 
         else if (call.name === 'agendar_horario') {
+          console.log("📅 Tentando agendar..."); // LOG NOVO
           const args = call.args as any;
           
           if (!args.nomeCliente || !args.telefoneCliente || !args.dataHora || !args.nomeServico) {
             respostaTexto = "Preciso de todos os dados para agendar: Nome do Serviço, Dia, Horário, seu Nome e Telefone.";
           } else {
             const allServices = await this.scheduleService.findAllServices();
-            const service = allServices.find(s => 
+            const service = allServices.find((s: any) => 
               s.name.toLowerCase().includes(args.nomeServico.toLowerCase())
             );
 
@@ -99,7 +109,7 @@ export class ChatService {
               } else {
                 const existingAppointments = await this.scheduleService.findAll();
                 
-                const isBusy = existingAppointments.some(appointment => {
+                const isBusy = existingAppointments.some((appointment: any) => {
                     const appointmentDate = new Date(appointment.dateTime);
                     const timeDiff = Math.abs(appointmentDate.getTime() - dataFormatada.getTime());
                     return timeDiff < 60 * 60 * 1000; 
@@ -121,22 +131,30 @@ export class ChatService {
               }
             }
           }
+        } else {
+            console.log("⚠️ IA chamou função desconhecida:", call.name);
+            respostaTexto = "Desculpe, tive um erro interno ao processar sua solicitação.";
         }
       } else {
         respostaTexto = response.text();
       }
 
-      if (respostaTexto) {
-          this.conversationHistory.push(
-            { role: 'user', parts: [{ text: message }] },
-            { role: 'model', parts: [{ text: respostaTexto }] }
-          );
+      // CORREÇÃO FINAL: Se a resposta continuar vazia, colocamos um padrão
+      if (!respostaTexto) {
+          console.log("⚠️ Resposta veio vazia da IA!");
+          respostaTexto = "Olá! Como posso ajudar você hoje?";
       }
+
+      // Salva no histórico
+      this.conversationHistory.push(
+        { role: 'user', parts: [{ text: message }] },
+        { role: 'model', parts: [{ text: respostaTexto }] }
+      );
 
       return respostaTexto;
 
     } catch (error: any) {
-      console.error(error);
+      console.error("❌ ERRO NO CHAT:", error);
       if (error.message && error.message.includes('429')) {
          return "Muitos pedidos no momento. Tente novamente em alguns segundos.";
       }
